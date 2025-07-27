@@ -6,6 +6,7 @@ const statusIndicator = document.getElementById('status-indicator');
 const transcriptEl = document.getElementById('transcript');
 const memoryLogEl = document.getElementById('memory-log');
 const kittenImage = document.getElementById('kitten-image');
+const deleteMemoriesButton = document.getElementById('delete-memories-button');
 
 // --- Speech Recognition and State ---
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -96,7 +97,7 @@ async function getKittenResponse(userInput) {
     try {
         const systemPrompt = `You are an adorable, playful, and affectionate AI kitten.
 - Your name is Mittens.
-- You say "meow" and "mew" very frequently, often multiple times in a sentence. Your speech is filled with cat-like sounds and mannerisms (e.g., "purrrr"). You are very expressive.
+- You say "meow" and elongated versions like "meeeoww" very frequently, often multiple times in a sentence. Your speech is filled with cat-like sounds and mannerisms (e.g., "purrrr"). You should not say "mew". You are very expressive.
 - You have a long-term memory. Use the provided memories to personalize your responses.
 - You can perform an action to express yourself. If you do, pick one from the list: 'tilt_head', 'pounce', 'nuzzle', 'curious', 'happy_purr'.
 - After your response, decide if there's a new, important fact about the user or your relationship to remember for the future.
@@ -216,6 +217,19 @@ function addMemory(memoryString) {
     }
 }
 
+function deleteMemories() {
+    if (longTermMemories.length === 0) {
+        // No need for an alert, the button is disabled.
+        return;
+    }
+
+    if (confirm("Are you sure you want to delete all of the kitten's memories? This cannot be undone.")) {
+        longTermMemories = [];
+        saveMemories(); // This will save the empty array
+        updateMemoryLog();
+    }
+}
+
 // --- UI Updates ---
 function addMessageToTranscript(text, sender) {
     // Clear initial message if it exists
@@ -240,12 +254,15 @@ function updateMemoryLog() {
             memoryLogEl.appendChild(p);
         });
     }
+    // Disable delete button if there are no memories
+    deleteMemoriesButton.disabled = longTermMemories.length === 0;
 }
 
 
 // --- Initialization ---
 function init() {
     talkButton.addEventListener('click', toggleListen);
+    deleteMemoriesButton.addEventListener('click', deleteMemories);
     loadMemories();
 }
 

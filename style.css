@@ -112,3 +112,7 @@ body {
     overflow-y: auto;
 }
 
+#delete-memories-button {
+    margin-top: 1rem;
+    width: 100%;
+}
