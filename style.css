@@ -108,8 +108,43 @@ body {
     background: var(--card-background-color);
     padding: 1rem;
     border-radius: var(--border-radius);
-    max-height: 150px;
+    max-height: 200px;
     overflow-y: auto;
+}
+
+.memory-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem;
+    border-radius: var(--border-radius);
+    transition: background-color 0.2s ease-in-out;
+}
+
+.memory-item:hover {
+    background-color: var(--card-sectionning-background-color);
+}
+
+.memory-item p {
+    margin: 0;
+    flex-grow: 1;
+}
+
+.memory-item button {
+    padding: 0.25rem;
+    line-height: 1;
+    min-width: auto;
+    width: auto;
+    height: auto;
+    margin-left: 1rem;
+    background-color: transparent;
+    border-color: transparent;
+    color: var(--muted-color);
+}
+.memory-item button:hover {
+    color: var(--primary);
+    background-color: transparent;
+    border-color: transparent;
 }
 
 #delete-memories-button {

@@ -1,4 +1,5 @@
 import { gsap } from 'gsap';
+import { createIcons, Trash2 } from 'lucide';
 
 const talkButton = document.getElementById('talk-button');
 const talkButtonText = talkButton.querySelector('span');
@@ -13,6 +14,7 @@ const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecogni
 let recognition;
 let isListening = false;
 let isThinking = false; // Add a new state to track AI processing
+let userManuallyStopped = false; // --- NEW --- Flag to prevent response after manual stop
 let conversationHistory = [];
 let longTermMemories = [];
 
@@ -23,6 +25,12 @@ if (SpeechRecognition) {
     recognition.interimResults = false;
 
     recognition.onresult = (event) => {
+        // --- MODIFIED --- check the flag before processing
+        if (userManuallyStopped) {
+            console.log("Recognition result ignored due to manual stop.");
+            return;
+        }
+
         isListening = false; // We got a result, so we are no longer "listening"
         statusIndicator.classList.remove('listening');
         
@@ -34,8 +42,13 @@ if (SpeechRecognition) {
     recognition.onend = () => {
         // This onend can be triggered by recognition.stop() or by speech ending.
         // We only want to restart if we are explicitly in a listening state and not transitioning to thinking.
-        if (isListening) {
+        if (isListening && !userManuallyStopped) {
             recognition.start(); // Keep listening if we are supposed to be.
+        } else {
+            // Ensure state is correct if stopped manually or for other reasons
+            isListening = false;
+            userManuallyStopped = false; // Reset flag
+            updateButtonState();
         }
     };
 
@@ -43,6 +56,7 @@ if (SpeechRecognition) {
         console.error("Speech recognition error:", event.error);
         isListening = false;
         isThinking = false;
+        userManuallyStopped = false; // Reset flag on error
         updateButtonState();
     };
 
@@ -59,8 +73,10 @@ function toggleListen() {
     isListening = !isListening;
 
     if (isListening) {
+        userManuallyStopped = false; // Reset flag when we start listening
         recognition.start();
     } else {
+        userManuallyStopped = true; // Set flag to indicate user action
         recognition.stop();
     }
     updateButtonState();
@@ -230,6 +246,16 @@ function deleteMemories() {
     }
 }
 
+// --- NEW --- Delete a single memory
+function deleteSingleMemory(index) {
+    if (index >= 0 && index < longTermMemories.length) {
+        longTermMemories.splice(index, 1);
+        saveMemories();
+        updateMemoryLog();
+    }
+}
+
+
 // --- UI Updates ---
 function addMessageToTranscript(text, sender) {
     // Clear initial message if it exists
@@ -248,10 +274,26 @@ function updateMemoryLog() {
         memoryLogEl.innerHTML = '<p><em>No memories stored yet.</em></p>';
     } else {
         memoryLogEl.innerHTML = '';
-        longTermMemories.forEach(mem => {
+        longTermMemories.forEach((mem, index) => {
+            const memoryItem = document.createElement('div');
+            memoryItem.className = 'memory-item';
+
             const p = document.createElement('p');
             p.textContent = `• ${mem}`;
-            memoryLogEl.appendChild(p);
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.setAttribute('aria-label', `Delete memory: ${mem}`);
+            deleteBtn.innerHTML = `<i data-lucide="trash-2" class="lucide-icon"></i>`;
+            deleteBtn.onclick = () => deleteSingleMemory(index);
+
+            memoryItem.appendChild(p);
+            memoryItem.appendChild(deleteBtn);
+            memoryLogEl.appendChild(memoryItem);
+        });
+        // Create icons after they are added to the DOM
+        createIcons({
+            icons: { Trash2 },
+            attrs: { 'stroke-width': 1.5, width: '18px', height: '18px' }
         });
     }
     // Disable delete button if there are no memories
