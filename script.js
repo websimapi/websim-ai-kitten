@@ -11,6 +11,7 @@ const kittenImage = document.getElementById('kitten-image');
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 let recognition;
 let isListening = false;
+let isThinking = false; // Add a new state to track AI processing
 let conversationHistory = [];
 let longTermMemories = [];
 
@@ -21,22 +22,27 @@ if (SpeechRecognition) {
     recognition.interimResults = false;
 
     recognition.onresult = (event) => {
+        isListening = false; // We got a result, so we are no longer "listening"
+        statusIndicator.classList.remove('listening');
+        
         const userInput = event.results[0][0].transcript;
         addMessageToTranscript(userInput, 'user');
         getKittenResponse(userInput);
     };
 
     recognition.onend = () => {
+        // This onend can be triggered by recognition.stop() or by speech ending.
+        // We only want to restart if we are explicitly in a listening state and not transitioning to thinking.
         if (isListening) {
-            recognition.start(); // Keep listening
+            recognition.start(); // Keep listening if we are supposed to be.
         }
     };
 
     recognition.onerror = (event) => {
         console.error("Speech recognition error:", event.error);
-        if (isListening) {
-            toggleListen(); // Turn off if there's an error
-        }
+        isListening = false;
+        isThinking = false;
+        updateButtonState();
     };
 
 } else {
@@ -50,24 +56,41 @@ function toggleListen() {
     if (!SpeechRecognition) return;
 
     isListening = !isListening;
+
     if (isListening) {
+        recognition.start();
+    } else {
+        recognition.stop();
+    }
+    updateButtonState();
+}
+
+// New function to centralize button state logic
+function updateButtonState() {
+    if (isThinking) {
+        talkButtonText.textContent = 'Kitten is thinking...';
+        talkButton.setAttribute('aria-busy', 'true');
+        talkButton.disabled = true;
+        statusIndicator.classList.remove('listening');
+    } else if (isListening) {
         talkButtonText.textContent = 'Stop Talking';
         talkButton.setAttribute('aria-busy', 'true');
+        talkButton.disabled = false;
         statusIndicator.classList.add('listening');
-        recognition.start();
     } else {
         talkButtonText.textContent = 'Start Talking';
         talkButton.removeAttribute('aria-busy');
+        talkButton.disabled = false;
         statusIndicator.classList.remove('listening');
-        recognition.stop();
     }
 }
 
 async function getKittenResponse(userInput) {
     // Show kitten is "thinking"
+    isThinking = true;
+    updateButtonState();
     gsap.to(kittenImage, { opacity: 0.7, duration: 0.5 });
-    talkButton.disabled = true;
-
+    
     conversationHistory.push({ role: "user", content: userInput });
 
     try {
@@ -112,12 +135,9 @@ ${longTermMemories.length > 0 ? longTermMemories.join('\n') : 'None yet.'}
         console.error("Error getting response from AI:", error);
         const errorMessage = "Meow... I'm a bit confused right meow. Can you try again?";
         addMessageToTranscript(errorMessage, 'kitten');
-        speak(errorMessage);
+        speak(errorMessage); // still call speak to handle state change on audio end
     } finally {
         gsap.to(kittenImage, { opacity: 1, duration: 0.5 });
-        if(!isListening){
-             talkButton.disabled = false;
-        }
     }
 }
 
@@ -146,7 +166,7 @@ function triggerKittenAnimation(action) {
 }
 
 async function speak(text) {
-    talkButton.disabled = true; // Disable while speaking
+    // isThinking is already true here. Button is disabled.
     kittenImage.classList.add('speaking');
     try {
         const result = await websim.textToSpeech({
@@ -156,20 +176,21 @@ async function speak(text) {
         const audio = new Audio(result.url);
         audio.play();
         audio.onended = () => {
+            isThinking = false; // Kitten is done speaking
             kittenImage.classList.remove('speaking');
-            if (isListening) {
-                 // if we are in continuous listen mode, we keep button disabled
-                 talkButton.disabled = true;
+            
+            // Automatically start listening again for a natural conversation flow
+            if (!isListening) {
+                toggleListen();
             } else {
-                 talkButton.disabled = false;
+                updateButtonState();
             }
         };
     } catch(error) {
         console.error("Error with text-to-speech:", error);
+        isThinking = false;
         kittenImage.classList.remove('speaking');
-        if(!isListening){
-            talkButton.disabled = false;
-        }
+        updateButtonState();
     }
 }
 
