@@ -1,0 +1,114 @@
+:root {
+  --indicator-color: #43a047; /* Green */
+  --indicator-size: 20px;
+}
+
+body {
+    padding-bottom: 5rem;
+}
+
+#kitten-container {
+    position: relative;
+    width: 250px;
+    height: 250px;
+    margin: 1rem auto;
+}
+
+#kitten-image {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 4px solid var(--card-border-color);
+    transition: transform 0.3s ease;
+}
+
+#kitten-image.speaking {
+    transform: scale(1.05);
+}
+
+
+#status-indicator {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    width: var(--indicator-size);
+    height: var(--indicator-size);
+    background-color: #e53935; /* Red */
+    border-radius: 50%;
+    border: 2px solid white;
+    box-shadow: 0 0 10px rgba(0,0,0,0.2);
+    transition: background-color 0.3s ease;
+}
+
+#status-indicator.listening {
+    background-color: var(--indicator-color);
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(67, 160, 71, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 15px rgba(67, 160, 71, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(67, 160, 71, 0);
+    }
+}
+
+
+#controls {
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+
+#talk-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1.1rem;
+    padding: 12px 24px;
+}
+
+#transcript-container {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+#transcript {
+    background-color: var(--card-background-color);
+    border: 1px solid var(--card-border-color);
+    padding: 1rem;
+    height: 200px;
+    overflow-y: auto;
+    border-radius: var(--border-radius);
+}
+
+#transcript p {
+    margin-bottom: 0.75rem;
+}
+
+#transcript p:last-child {
+    margin-bottom: 0;
+}
+
+.user-message {
+    font-weight: bold;
+    color: var(--h-color);
+}
+
+.kitten-message {
+    color: var(--primary);
+    font-style: italic;
+}
+
+#memory-log {
+    background: var(--card-background-color);
+    padding: 1rem;
+    border-radius: var(--border-radius);
+    max-height: 150px;
+    overflow-y: auto;
+}
+
