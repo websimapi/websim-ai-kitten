@@ -9,14 +9,17 @@ const memoryLogEl = document.getElementById('memory-log');
 const kittenImage = document.getElementById('kitten-image');
 const deleteMemoriesButton = document.getElementById('delete-memories-button');
 
-// --- Speech Recognition and State ---
-const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 let recognition;
 let isListening = false;
-let isThinking = false; // Add a new state to track AI processing
-let userManuallyStopped = false; // --- NEW --- Flag to prevent response after manual stop
+let isThinking = false;
+let userManuallyStopped = false;
 let conversationHistory = [];
 let longTermMemories = [];
+let currentAudio = null; // To hold the current playing audio
+let thinkingRequestCancelled = false; // To cancel a pending AI response
+
+// --- Speech Recognition ---
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
 if (SpeechRecognition) {
     recognition = new SpeechRecognition();
@@ -24,15 +27,21 @@ if (SpeechRecognition) {
     recognition.lang = 'en-US';
     recognition.interimResults = false;
 
+    recognition.onstart = () => {
+        isListening = true;
+        userManuallyStopped = false;
+        updateButtonState();
+    };
+
     recognition.onresult = (event) => {
-        // --- MODIFIED --- check the flag before processing
         if (userManuallyStopped) {
             console.log("Recognition result ignored due to manual stop.");
             return;
         }
 
-        isListening = false; // We got a result, so we are no longer "listening"
-        statusIndicator.classList.remove('listening');
+        // We got a result, so we are no longer "listening" for this utterance
+        isListening = false; 
+        updateButtonState(); // Show "thinking" state immediately
         
         const userInput = event.results[0][0].transcript;
         addMessageToTranscript(userInput, 'user');
@@ -40,15 +49,11 @@ if (SpeechRecognition) {
     };
 
     recognition.onend = () => {
-        // This onend can be triggered by recognition.stop() or by speech ending.
-        // We only want to restart if we are explicitly in a listening state and not transitioning to thinking.
-        if (isListening && !userManuallyStopped) {
-            recognition.start(); // Keep listening if we are supposed to be.
-        } else {
-            // Ensure state is correct if stopped manually or for other reasons
-            isListening = false;
-            userManuallyStopped = false; // Reset flag
-            updateButtonState();
+        isListening = false;
+        // Don't change state if we are now thinking.
+        // updateButtonState will be handled by getKittenResponse or handleTalkButtonClick
+        if (!isThinking) {
+             updateButtonState();
         }
     };
 
@@ -56,7 +61,7 @@ if (SpeechRecognition) {
         console.error("Speech recognition error:", event.error);
         isListening = false;
         isThinking = false;
-        userManuallyStopped = false; // Reset flag on error
+        userManuallyStopped = false;
         updateButtonState();
     };
 
@@ -67,44 +72,59 @@ if (SpeechRecognition) {
 
 // --- Core Functions ---
 
-function toggleListen() {
+function handleTalkButtonClick() {
     if (!SpeechRecognition) return;
 
-    isListening = !isListening;
-
-    if (isListening) {
-        userManuallyStopped = false; // Reset flag when we start listening
-        recognition.start();
-    } else {
-        userManuallyStopped = true; // Set flag to indicate user action
+    if (isThinking) {
+        // This is now a "Stop Kitten" button
+        console.log('Stopping kitten...');
+        thinkingRequestCancelled = true; // Flag to cancel any in-flight request
+        if (currentAudio) {
+            currentAudio.pause();
+            currentAudio.currentTime = 0;
+            currentAudio = null;
+        }
+        isThinking = false;
+        kittenImage.classList.remove('speaking');
+        gsap.to(kittenImage, { opacity: 1, duration: 0.3 });
+        updateButtonState();
+    } else if (isListening) {
+        // This is a "Stop Talking" button
+        console.log('Stopping listening...');
+        userManuallyStopped = true;
         recognition.stop();
+        isListening = false;
+        updateButtonState();
+    } else {
+        // This is a "Start Talking" button
+        console.log('Starting listening...');
+        userManuallyStopped = false;
+        recognition.start();
     }
-    updateButtonState();
 }
 
-// New function to centralize button state logic
 function updateButtonState() {
     if (isThinking) {
-        talkButtonText.textContent = 'Kitten is thinking...';
-        talkButton.setAttribute('aria-busy', 'true');
-        talkButton.disabled = true;
+        talkButtonText.textContent = 'Stop Kitten';
+        talkButton.disabled = false;
+        talkButton.removeAttribute('aria-busy');
         statusIndicator.classList.remove('listening');
     } else if (isListening) {
         talkButtonText.textContent = 'Stop Talking';
-        talkButton.setAttribute('aria-busy', 'true');
         talkButton.disabled = false;
+        talkButton.setAttribute('aria-busy', 'true');
         statusIndicator.classList.add('listening');
     } else {
         talkButtonText.textContent = 'Start Talking';
-        talkButton.removeAttribute('aria-busy');
         talkButton.disabled = false;
+        talkButton.removeAttribute('aria-busy');
         statusIndicator.classList.remove('listening');
     }
 }
 
 async function getKittenResponse(userInput) {
-    // Show kitten is "thinking"
     isThinking = true;
+    thinkingRequestCancelled = false; // Reset cancellation flag for this new request
     updateButtonState();
     gsap.to(kittenImage, { opacity: 0.7, duration: 0.5 });
     
@@ -133,6 +153,12 @@ ${longTermMemories.length > 0 ? longTermMemories.join('\n') : 'None yet.'}
             json: true,
         });
 
+        if (thinkingRequestCancelled) {
+            console.log("AI response cancelled by user.");
+            // State is already reset by handleTalkButtonClick, so just exit.
+            return;
+        }
+
         const result = JSON.parse(completion.content);
         
         conversationHistory.push({ role: "assistant", content: result.response });
@@ -150,11 +176,15 @@ ${longTermMemories.length > 0 ? longTermMemories.join('\n') : 'None yet.'}
 
     } catch (error) {
         console.error("Error getting response from AI:", error);
-        const errorMessage = "Meow... I'm a bit confused right meow. Can you try again?";
-        addMessageToTranscript(errorMessage, 'kitten');
-        speak(errorMessage); // still call speak to handle state change on audio end
+        if (!thinkingRequestCancelled) {
+            const errorMessage = "Meow... I'm a bit confused right meow. Can you try again?";
+            addMessageToTranscript(errorMessage, 'kitten');
+            speak(errorMessage); // still call speak to handle state change on audio end
+        }
     } finally {
-        gsap.to(kittenImage, { opacity: 1, duration: 0.5 });
+        if (!thinkingRequestCancelled) {
+            gsap.to(kittenImage, { opacity: 1, duration: 0.5 });
+        }
     }
 }
 
@@ -183,34 +213,42 @@ function triggerKittenAnimation(action) {
 }
 
 async function speak(text) {
-    // isThinking is already true here. Button is disabled.
+    // isThinking is already true here.
     kittenImage.classList.add('speaking');
     try {
         const result = await websim.textToSpeech({
             text: text,
             voice: "en-female"
         });
+
+        if (thinkingRequestCancelled) {
+            console.log("TTS generation cancelled by user.");
+            return;
+        }
+
         const audio = new Audio(result.url);
+        currentAudio = audio; // Store reference to the audio object
+
         audio.play();
+
         audio.onended = () => {
-            isThinking = false; // Kitten is done speaking
-            kittenImage.classList.remove('speaking');
-            
-            // Automatically start listening again for a natural conversation flow
-            if (!isListening) {
-                toggleListen();
-            } else {
-                updateButtonState();
+            currentAudio = null; // Clear reference
+            if (!thinkingRequestCancelled) {
+                 isThinking = false;
+                 kittenImage.classList.remove('speaking');
+                 updateButtonState();
             }
         };
     } catch(error) {
         console.error("Error with text-to-speech:", error);
-        isThinking = false;
-        kittenImage.classList.remove('speaking');
-        updateButtonState();
+        currentAudio = null;
+        if (!thinkingRequestCancelled) {
+            isThinking = false;
+            kittenImage.classList.remove('speaking');
+            updateButtonState();
+        }
     }
 }
-
 
 // --- Memory Management ---
 function loadMemories() {
@@ -254,7 +292,6 @@ function deleteSingleMemory(index) {
         updateMemoryLog();
     }
 }
-
 
 // --- UI Updates ---
 function addMessageToTranscript(text, sender) {
@@ -300,12 +337,12 @@ function updateMemoryLog() {
     deleteMemoriesButton.disabled = longTermMemories.length === 0;
 }
 
-
 // --- Initialization ---
 function init() {
-    talkButton.addEventListener('click', toggleListen);
+    talkButton.addEventListener('click', handleTalkButtonClick);
     deleteMemoriesButton.addEventListener('click', deleteMemories);
     loadMemories();
+    updateButtonState(); // Set initial button state
 }
 
 init();
