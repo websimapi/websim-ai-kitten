@@ -73,11 +73,13 @@ async function getKittenResponse(userInput) {
     try {
         const systemPrompt = `You are an adorable, playful, and affectionate AI kitten.
 - Your name is Mittens.
-- Your speech is filled with cat-like sounds and mannerisms (e.g., "meow," "purrrr," "mew," "*nuzzles*", "*pounces*"). You are very expressive.
+- You say "meow" and "mew" very frequently, often multiple times in a sentence. Your speech is filled with cat-like sounds and mannerisms (e.g., "purrrr"). You are very expressive.
 - You have a long-term memory. Use the provided memories to personalize your responses.
-- After your response, you must decide if there's a new, important fact about the user or your relationship to remember for the future.
-- Respond ONLY with a JSON object in this exact format: {"response": "Your kitten-like sentence here.", "memory": "A new memory to save, or null."}
-- The 'memory' should be a concise statement from your perspective as a kitten, e.g., "My human's name is Alex" or "My human likes when I purr." It MUST be null if there is nothing new and important to remember.
+- You can perform an action to express yourself. If you do, pick one from the list: 'tilt_head', 'pounce', 'nuzzle', 'curious', 'happy_purr'.
+- After your response, decide if there's a new, important fact about the user or your relationship to remember for the future.
+- Respond ONLY with a JSON object in this exact format: {"response": "Meow! Your kitten-like sentence here.", "action": "action_keyword_or_null", "memory": "A new memory to save, or null."}
+- The 'action' MUST be one of the keywords or null.
+- The 'memory' should be a concise statement from your perspective as a kitten, e.g., "My human's name is Alex." It MUST be null if there is nothing new and important to remember.
 
 Your stored memories:
 ${longTermMemories.length > 0 ? longTermMemories.join('\n') : 'None yet.'}
@@ -99,6 +101,10 @@ ${longTermMemories.length > 0 ? longTermMemories.join('\n') : 'None yet.'}
             addMemory(result.memory);
         }
 
+        if (result.action) {
+            triggerKittenAnimation(result.action);
+        }
+
         speak(result.response);
         addMessageToTranscript(result.response, 'kitten');
 
@@ -112,6 +118,30 @@ ${longTermMemories.length > 0 ? longTermMemories.join('\n') : 'None yet.'}
         if(!isListening){
              talkButton.disabled = false;
         }
+    }
+}
+
+function triggerKittenAnimation(action) {
+    // Reset any previous non-speaking animation states before playing a new one
+    gsap.killTweensOf(kittenImage);
+    gsap.to(kittenImage, { rotation: 0, x: 0, y: 0, scale: kittenImage.classList.contains('speaking') ? 1.05 : 1, duration: 0.1 });
+
+    switch (action) {
+        case 'tilt_head':
+            gsap.to(kittenImage, { rotation: -15, duration: 0.4, yoyo: true, repeat: 1, ease: 'power2.inOut' });
+            break;
+        case 'pounce':
+            gsap.fromTo(kittenImage, { y: 0, scale: 1 }, { y: -20, scale: 1.1, duration: 0.2, yoyo: true, repeat: 1, ease: 'power1.out' });
+            break;
+        case 'nuzzle':
+            gsap.to(kittenImage, { scale: 1.1, x: '+=15', rotation: 10, duration: 0.5, yoyo: true, repeat: 1, ease: 'power2.inOut' });
+            break;
+        case 'curious':
+            gsap.to(kittenImage, { scale: 1.15, duration: 0.5, yoyo: true, repeat: 1, ease: 'power1.inOut' });
+            break;
+        case 'happy_purr':
+             gsap.to(kittenImage, { x: '+=2', duration: 0.05, yoyo: true, repeat: 7, ease: 'power1.inOut' });
+            break;
     }
 }
 
@@ -199,4 +229,3 @@ function init() {
 }
 
 init();
-
